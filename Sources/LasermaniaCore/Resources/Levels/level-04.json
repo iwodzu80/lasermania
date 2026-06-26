@@ -1,0 +1,17 @@
+{
+  "id": "level-04",
+  "name": "Two Eyes",
+  "parMoves": 10,
+  "sensorModel": "A",
+  "legend": {
+    "L": { "type": "emitter", "dir": "right" }
+  },
+  "layout": [
+    "###########",
+    "#@........#",
+    "#.........#",
+    "#L.S.B.S..#",
+    "#.........#",
+    "#####D#####"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "level-02",
+  "name": "Step Aside",
+  "parMoves": 10,
+  "sensorModel": "A",
+  "legend": {
+    "L": { "type": "emitter", "dir": "right" }
+  },
+  "layout": [
+    "##########",
+    "#@.......#",
+    "#L..B...S#",
+    "#........#",
+    "########D#"
+  ]
+}
