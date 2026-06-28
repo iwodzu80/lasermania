@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// SwiftUI entry point (§7: "AppMain.swift — SwiftUI WindowGroup hosting
 /// SKView"). Replaces the default Edit menu's Undo/Redo command group:
@@ -13,6 +14,13 @@ struct LasermaniaMacApp: App {
     var body: some Scene {
         WindowGroup("Lasermania") {
             ContentView(appState: appState)
+                .onAppear {
+                    // `swift run` launches the app from Terminal rather than
+                    // via Launch Services, so macOS doesn't automatically
+                    // hand it keyboard/mouse focus — without this, the
+                    // window is visible but inert until manually clicked.
+                    NSApplication.shared.activate(ignoringOtherApps: true)
+                }
         }
         .commands {
             CommandGroup(replacing: .undoRedo) { }
