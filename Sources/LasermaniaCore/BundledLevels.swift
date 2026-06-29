@@ -20,13 +20,13 @@ public enum BundledLevelsError: Error, CustomStringConvertible {
 
 public enum BundledLevels {
     public static func all() throws -> [LevelDefinition] {
-        guard let manifestURL = Bundle.module.url(forResource: "manifest", withExtension: "json", subdirectory: "Resources/Levels") else {
+        guard let manifestURL = Bundle.module.url(forResource: "manifest", withExtension: "json", subdirectory: "Levels") else {
             throw BundledLevelsError.manifestNotFound
         }
         let manifest = try JSONDecoder().decode(LevelManifest.self, from: Data(contentsOf: manifestURL))
 
         return try manifest.levels.map { id in
-            guard let url = Bundle.module.url(forResource: id, withExtension: "json", subdirectory: "Resources/Levels") else {
+            guard let url = Bundle.module.url(forResource: id, withExtension: "json", subdirectory: "Levels") else {
                 throw BundledLevelsError.levelNotFound(id)
             }
             return try JSONDecoder().decode(LevelDefinition.self, from: Data(contentsOf: url))
