@@ -52,7 +52,7 @@ public final class GameScene: SKScene {
     }
 
     public override func didMove(to view: SKView) {
-        backgroundColor = palette.background
+        backgroundColor = .black
 
         crawlerBody.strokeColor = .clear
         crawlerFacingDot.strokeColor = .clear
@@ -139,28 +139,40 @@ public final class GameScene: SKScene {
 
                 switch grid.terrain[row][col] {
                 case .floor:
-                    tile.fillColor = palette.floor
+                    tile.fillColor = .black
                 case .wall:
                     tile.fillColor = palette.wall
                 case .emitter(let direction):
-                    tile.fillColor = palette.floor
+                    tile.fillColor = .black
                     tile.addChild(emitterMarker(direction: direction))
                 case .sensorSite:
-                    tile.fillColor = palette.sensorPad
+                    tile.fillColor = .black
                 case .door:
-                    tile.fillColor = palette.floor
+                    tile.fillColor = .black
                 }
                 terrainLayer.addChild(tile)
             }
         }
     }
 
-    private func emitterMarker(direction: Direction) -> SKShapeNode {
-        let dot = SKShapeNode(circleOfRadius: tileSize * 0.12)
-        dot.position = offset(for: direction, distance: tileSize * 0.28)
-        dot.fillColor = palette.emitter
+    private static let amber = SKColor(red: 1.0, green: 0.84, blue: 0.3, alpha: 1)
+
+    /// The emitter reads as an amber ring (like the original's device) with a
+    /// small dot on the side the diagonal beam leaves from.
+    private func emitterMarker(direction: Diagonal) -> SKNode {
+        let node = SKNode()
+        let ring = SKShapeNode(circleOfRadius: tileSize * 0.30)
+        ring.fillColor = .clear
+        ring.strokeColor = Self.amber
+        ring.lineWidth = max(2, tileSize * 0.08)
+        node.addChild(ring)
+        let dot = SKShapeNode(circleOfRadius: tileSize * 0.10)
+        dot.position = CGPoint(x: CGFloat(direction.step.dc) * tileSize * 0.28,
+                               y: CGFloat(-direction.step.dr) * tileSize * 0.28)
+        dot.fillColor = Self.amber
         dot.strokeColor = .clear
-        return dot
+        node.addChild(dot)
+        return node
     }
 
     // MARK: - Dynamic render
@@ -238,7 +250,7 @@ public final class GameScene: SKScene {
         path.move(to: from)
         path.addLine(to: to)
         let line = SKShapeNode(path: path)
-        line.strokeColor = palette.beam
+        line.strokeColor = SKColor(white: 0.95, alpha: 1)
         line.lineWidth = max(2, tileSize * 0.12)
         line.lineCap = .round
         line.glowWidth = tileSize * 0.18
@@ -256,36 +268,34 @@ public final class GameScene: SKScene {
     private func addBeamDot(at position: CGPoint) {
         let dot = SKShapeNode(circleOfRadius: tileSize * 0.15)
         dot.position = position
-        dot.fillColor = palette.beam
+        dot.fillColor = SKColor(white: 0.95, alpha: 1)
         dot.strokeColor = .clear
         dot.glowWidth = tileSize * 0.2
         beamLayer.addChild(dot)
     }
 
+    /// All movables are steel blocks now (the diagonal-laser reflectors), drawn
+    /// like the original: green body with a light top edge and dark under-edge.
     private func renderMovables(_ state: GameState) {
         movablesLayer.removeAllChildren()
-        for (coord, kind) in state.movables {
-            let node: SKShapeNode
-            switch kind {
-            case .box:
-                node = SKShapeNode(rectOf: CGSize(width: tileSize * 0.7, height: tileSize * 0.7), cornerRadius: tileSize * 0.08)
-                node.fillColor = palette.box
-                node.strokeColor = .clear
-            case .mirrorSlash, .mirrorBackslash:
-                let half = tileSize * 0.35
-                let path = CGMutablePath()
-                if kind == .mirrorSlash {
-                    path.move(to: CGPoint(x: -half, y: -half))
-                    path.addLine(to: CGPoint(x: half, y: half))
-                } else {
-                    path.move(to: CGPoint(x: -half, y: half))
-                    path.addLine(to: CGPoint(x: half, y: -half))
-                }
-                node = SKShapeNode(path: path)
-                node.strokeColor = palette.mirror
-                node.lineWidth = max(2, tileSize * 0.12)
-                node.lineCap = .round
-            }
+        let side = tileSize * 0.92
+        let edge = max(2, tileSize * 0.10)
+        for (coord, _) in state.movables {
+            let node = SKNode()
+            let body = SKShapeNode(rectOf: CGSize(width: side, height: side))
+            body.fillColor = SKColor(red: 0.16, green: 0.55, blue: 0.16, alpha: 1)
+            body.strokeColor = .clear
+            node.addChild(body)
+            let top = SKShapeNode(rectOf: CGSize(width: side, height: edge))
+            top.fillColor = SKColor(white: 0.85, alpha: 1)
+            top.strokeColor = .clear
+            top.position = CGPoint(x: 0, y: side / 2 - edge / 2)
+            node.addChild(top)
+            let bottom = SKShapeNode(rectOf: CGSize(width: side, height: edge))
+            bottom.fillColor = SKColor(red: 0.45, green: 0.05, blue: 0.05, alpha: 1)
+            bottom.strokeColor = .clear
+            bottom.position = CGPoint(x: 0, y: -side / 2 + edge / 2)
+            node.addChild(bottom)
             node.position = point(for: coord, in: state.grid)
             movablesLayer.addChild(node)
         }

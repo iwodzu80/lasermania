@@ -11,4 +11,9 @@ public struct Coord: Hashable, Codable, Sendable {
         let step = direction.step
         return Coord(col: col + step.dc, row: row + step.dr)
     }
+
+    public func moved(_ diagonal: Diagonal) -> Coord {
+        let step = diagonal.step
+        return Coord(col: col + step.dc, row: row + step.dr)
+    }
 }

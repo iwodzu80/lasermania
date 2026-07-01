@@ -23,7 +23,7 @@ public enum LevelLoadError: Error, CustomStringConvertible, Equatable {
         case .missingEmitterLegend(let id, let symbol):
             return "Level '\(id)': symbol '\(symbol)' needs a legend entry with type \"emitter\" and a \"dir\"."
         case .invalidDirection(let id, let value):
-            return "Level '\(id)': invalid direction '\(value)' in legend. Expected up, down, left, or right."
+            return "Level '\(id)': invalid emitter direction '\(value)' in legend. Expected ne, nw, se, or sw."
         case .duplicateCrawler(let id):
             return "Level '\(id)': found more than one '@' crawler start. Exactly one is required."
         case .duplicateEmitter(let id):
@@ -57,7 +57,7 @@ public enum LevelLoader {
         var sensors: Set<Coord> = []
         var crawlerCoord: Coord?
         var emitterCoord: Coord?
-        var emitterDirection: Direction?
+        var emitterDirection: Diagonal?
         var doorCoord: Coord?
 
         for (rowIndex, rowString) in level.layout.enumerated() {
@@ -154,11 +154,11 @@ public enum LevelLoader {
         forSymbol symbol: Character,
         legend: [String: LevelDefinition.LegendEntry]?,
         levelID: String
-    ) throws -> Direction {
+    ) throws -> Diagonal {
         guard let entry = legend?[String(symbol)], let dirString = entry.dir else {
             throw LevelLoadError.missingEmitterLegend(levelID: levelID, symbol: symbol)
         }
-        guard let direction = Direction(rawValue: dirString) else {
+        guard let direction = Diagonal(rawValue: dirString) else {
             throw LevelLoadError.invalidDirection(levelID: levelID, value: dirString)
         }
         return direction

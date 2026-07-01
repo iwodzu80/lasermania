@@ -1,16 +1,22 @@
 {
   "id": "level-01",
   "name": "First Light",
-  "parMoves": 9,
-  "sensorModel": "A",
+  "parMoves": 20,
   "legend": {
-    "L": { "type": "emitter", "dir": "right" }
+    "L": { "type": "emitter", "dir": "se" }
   },
   "layout": [
-    "#########",
-    "#@..C...#",
-    "#.......#",
-    "#L.....S#",
-    "#######D#"
+    "...B.B........B.",
+    ".B.B...B.B..B...",
+    "...C...B.B..SB..",
+    "..BB.......B....",
+    "L....B.B.B......",
+    "B.B...B.S..BBBCB",
+    "B...S.B.B.......",
+    "B...B..C.B.C....",
+    ".....@.....B..BS",
+    ".B.B...B..B.....",
+    "B......C....B...",
+    ".B.....B....DBBB"
   ]
 }

@@ -3,7 +3,7 @@ public struct Grid: Equatable, Sendable {
     public let rows: Int
     public let terrain: [[StaticTerrain]]
     public let emitterCoord: Coord
-    public let emitterDirection: Direction
+    public let emitterDirection: Diagonal
     public let doorCoord: Coord
     public let sensorCoords: Set<Coord>
 
