@@ -23,7 +23,8 @@ let package = Package(
                 "LasermaniaCore"
             ],
             resources: [
-                .copy("Resources/Audio")
+                .copy("Resources/Audio"),
+                .copy("Resources/Sprites")
             ]
         ),
         .testTarget(

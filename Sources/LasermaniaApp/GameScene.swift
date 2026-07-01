@@ -27,8 +27,13 @@ public final class GameScene: SKScene {
     private let effectsLayer = SKNode()
 
     private let crawlerNode = SKNode()
-    private let crawlerBody = SKShapeNode(circleOfRadius: 1)
-    private let crawlerFacingDot = SKShapeNode(circleOfRadius: 1)
+
+    // Sprites cropped from the original screenshot, bundled as resources.
+    private var blockTexture: SKTexture?
+    private var ovalTexture: SKTexture?     // shared by sensors and the emitter
+    private var memoryTexture: SKTexture?
+    private var vehicleTexture: SKTexture?
+    private var baseTexture: SKTexture?
 
     private var tileSize: CGFloat = 32
     private var previousState: GameState?
@@ -54,10 +59,11 @@ public final class GameScene: SKScene {
     public override func didMove(to view: SKView) {
         backgroundColor = .black
 
-        crawlerBody.strokeColor = .clear
-        crawlerFacingDot.strokeColor = .clear
-        crawlerNode.addChild(crawlerBody)
-        crawlerNode.addChild(crawlerFacingDot)
+        blockTexture = loadTexture("block")
+        ovalTexture = loadTexture("oval")
+        memoryTexture = loadTexture("memory")
+        vehicleTexture = loadTexture("vehicle")
+        baseTexture = loadTexture("base")
 
         boardNode.addChild(terrainLayer)
         boardNode.addChild(sensorsLayer)
@@ -157,9 +163,33 @@ public final class GameScene: SKScene {
 
     private static let amber = SKColor(red: 1.0, green: 0.84, blue: 0.3, alpha: 1)
 
-    /// The emitter reads as an amber ring (like the original's device) with a
-    /// small dot on the side the diagonal beam leaves from.
+    /// Loads a bundled sprite by name, trying both resource-subdirectory forms
+    /// (SwiftPM's `.copy` flattens the path). Nearest-neighbour keeps the retro
+    /// pixels crisp when scaled. Returns nil so callers can fall back to shapes.
+    private func loadTexture(_ name: String) -> SKTexture? {
+        for sub in ["Sprites", "Resources/Sprites"] {
+            if let url = Bundle.module.url(forResource: name, withExtension: "png", subdirectory: sub),
+               let image = NSImage(contentsOf: url) {
+                let texture = SKTexture(image: image)
+                texture.filteringMode = .nearest
+                return texture
+            }
+        }
+        return nil
+    }
+
+    private func spriteNode(_ texture: SKTexture) -> SKSpriteNode {
+        let node = SKSpriteNode(texture: texture)
+        node.size = CGSize(width: tileSize, height: tileSize)
+        return node
+    }
+
+    /// The emitter uses the same oval sprite as the sensors (as in the
+    /// original). Falls back to an amber ring + a dot on the firing side.
     private func emitterMarker(direction: Diagonal) -> SKNode {
+        if let texture = ovalTexture {
+            return spriteNode(texture)
+        }
         let node = SKNode()
         let ring = SKShapeNode(circleOfRadius: tileSize * 0.30)
         ring.fillColor = .clear
@@ -202,30 +232,44 @@ public final class GameScene: SKScene {
     private func renderSensors(_ state: GameState) {
         sensorsLayer.removeAllChildren()
         for coord in state.remainingSensors {
-            let dot = SKShapeNode(circleOfRadius: tileSize * 0.22)
-            dot.position = point(for: coord, in: state.grid)
-            dot.fillColor = palette.sensorActive
-            dot.strokeColor = .clear
+            let node: SKNode
+            if let texture = ovalTexture {
+                node = spriteNode(texture)
+            } else {
+                let dot = SKShapeNode(circleOfRadius: tileSize * 0.22)
+                dot.fillColor = palette.sensorActive
+                dot.strokeColor = .clear
+                node = dot
+            }
+            node.position = point(for: coord, in: state.grid)
             if !settings.reduceMotion {
                 let pulse = SKAction.sequence([
-                    SKAction.scale(to: 1.25, duration: 0.5),
+                    SKAction.scale(to: 1.12, duration: 0.5),
                     SKAction.scale(to: 1.0, duration: 0.5)
                 ])
-                dot.run(SKAction.repeatForever(pulse))
+                node.run(SKAction.repeatForever(pulse))
             }
-            sensorsLayer.addChild(dot)
+            sensorsLayer.addChild(node)
         }
     }
 
     private func renderDoor(_ state: GameState) {
         doorLayer.removeAllChildren()
         let grid = state.grid
-        let panel = SKShapeNode(rectOf: CGSize(width: tileSize * 0.8, height: tileSize * 0.8))
-        panel.position = point(for: grid.doorCoord, in: grid)
-        panel.strokeColor = .clear
-        panel.fillColor = state.doorUnlocked ? palette.doorOpen : palette.doorLocked
-        panel.alpha = state.doorUnlocked ? 0.5 : 1.0
-        doorLayer.addChild(panel)
+        let node: SKNode
+        if let texture = baseTexture {
+            let sprite = spriteNode(texture)
+            sprite.alpha = state.doorUnlocked ? 1.0 : 0.55   // dim until sensors + memories are done
+            node = sprite
+        } else {
+            let panel = SKShapeNode(rectOf: CGSize(width: tileSize * 0.8, height: tileSize * 0.8))
+            panel.strokeColor = .clear
+            panel.fillColor = state.doorUnlocked ? palette.doorOpen : palette.doorLocked
+            panel.alpha = state.doorUnlocked ? 0.5 : 1.0
+            node = panel
+        }
+        node.position = point(for: grid.doorCoord, in: grid)
+        doorLayer.addChild(node)
     }
 
     private func renderBeam(_ state: GameState) {
@@ -274,56 +318,77 @@ public final class GameScene: SKScene {
         beamLayer.addChild(dot)
     }
 
-    /// All movables are steel blocks now (the diagonal-laser reflectors), drawn
-    /// like the original: green body with a light top edge and dark under-edge.
+    /// All movables are steel blocks (the diagonal-laser reflectors). Prefers
+    /// the bundled block sprite; falls back to a green beveled rectangle.
     private func renderMovables(_ state: GameState) {
         movablesLayer.removeAllChildren()
-        let side = tileSize * 0.92
-        let edge = max(2, tileSize * 0.10)
         for (coord, _) in state.movables {
-            let node = SKNode()
-            let body = SKShapeNode(rectOf: CGSize(width: side, height: side))
-            body.fillColor = SKColor(red: 0.16, green: 0.55, blue: 0.16, alpha: 1)
-            body.strokeColor = .clear
-            node.addChild(body)
-            let top = SKShapeNode(rectOf: CGSize(width: side, height: edge))
-            top.fillColor = SKColor(white: 0.85, alpha: 1)
-            top.strokeColor = .clear
-            top.position = CGPoint(x: 0, y: side / 2 - edge / 2)
-            node.addChild(top)
-            let bottom = SKShapeNode(rectOf: CGSize(width: side, height: edge))
-            bottom.fillColor = SKColor(red: 0.45, green: 0.05, blue: 0.05, alpha: 1)
-            bottom.strokeColor = .clear
-            bottom.position = CGPoint(x: 0, y: -side / 2 + edge / 2)
-            node.addChild(bottom)
+            let node: SKNode
+            if let texture = blockTexture {
+                node = spriteNode(texture)
+            } else {
+                node = steelBlockShape()
+            }
             node.position = point(for: coord, in: state.grid)
             movablesLayer.addChild(node)
         }
     }
 
+    private func steelBlockShape() -> SKNode {
+        let side = tileSize * 0.92
+        let edge = max(2, tileSize * 0.10)
+        let node = SKNode()
+        let body = SKShapeNode(rectOf: CGSize(width: side, height: side))
+        body.fillColor = SKColor(red: 0.16, green: 0.55, blue: 0.16, alpha: 1)
+        body.strokeColor = .clear
+        node.addChild(body)
+        let top = SKShapeNode(rectOf: CGSize(width: side, height: edge))
+        top.fillColor = SKColor(white: 0.85, alpha: 1)
+        top.strokeColor = .clear
+        top.position = CGPoint(x: 0, y: side / 2 - edge / 2)
+        node.addChild(top)
+        let bottom = SKShapeNode(rectOf: CGSize(width: side, height: edge))
+        bottom.fillColor = SKColor(red: 0.45, green: 0.05, blue: 0.05, alpha: 1)
+        bottom.strokeColor = .clear
+        bottom.position = CGPoint(x: 0, y: -side / 2 + edge / 2)
+        node.addChild(bottom)
+        return node
+    }
+
     private func renderCapsules(_ state: GameState) {
         capsulesLayer.removeAllChildren()
         for coord in state.remainingCapsules {
-            let capsule = SKShapeNode(circleOfRadius: tileSize * 0.18)
-            capsule.position = point(for: coord, in: state.grid)
-            capsule.fillColor = palette.capsule
-            capsule.strokeColor = .clear
-            capsulesLayer.addChild(capsule)
+            let node: SKNode
+            if let texture = memoryTexture {
+                node = spriteNode(texture)
+            } else {
+                let capsule = SKShapeNode(circleOfRadius: tileSize * 0.18)
+                capsule.fillColor = palette.capsule
+                capsule.strokeColor = .clear
+                node = capsule
+            }
+            node.position = point(for: coord, in: state.grid)
+            capsulesLayer.addChild(node)
         }
     }
 
     private func renderCrawler(_ state: GameState) {
+        crawlerNode.removeAllChildren()
+        if let texture = vehicleTexture {
+            crawlerNode.addChild(spriteNode(texture))
+        } else {
+            let body = SKShapeNode(circleOfRadius: tileSize * 0.32)
+            body.fillColor = palette.crawler
+            body.strokeColor = .clear
+            crawlerNode.addChild(body)
+            let dot = SKShapeNode(circleOfRadius: tileSize * 0.08)
+            dot.fillColor = palette.background
+            dot.strokeColor = .clear
+            dot.position = offset(for: state.facing, distance: tileSize * 0.24)
+            crawlerNode.addChild(dot)
+        }
+
         let target = point(for: state.crawler, in: state.grid)
-        let bodyRadius = tileSize * 0.32
-        let dotRadius = tileSize * 0.08
-
-        crawlerBody.path = CGPath(ellipseIn: CGRect(x: -bodyRadius, y: -bodyRadius, width: bodyRadius * 2, height: bodyRadius * 2), transform: nil)
-        crawlerBody.fillColor = palette.crawler
-
-        crawlerFacingDot.path = CGPath(ellipseIn: CGRect(x: -dotRadius, y: -dotRadius, width: dotRadius * 2, height: dotRadius * 2), transform: nil)
-        crawlerFacingDot.fillColor = palette.background
-        crawlerFacingDot.position = offset(for: state.facing, distance: tileSize * 0.24)
-
         if settings.reduceMotion {
             crawlerNode.removeAllActions()
             crawlerNode.position = target
