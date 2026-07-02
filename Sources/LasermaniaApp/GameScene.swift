@@ -282,19 +282,23 @@ public final class GameScene: SKScene {
 
     private func renderBeam(_ state: GameState) {
         beamLayer.removeAllChildren()
-        let grid = state.grid
         let trace = state.beam
-        guard !trace.segments.isEmpty else { return }
+        guard trace.points.count > 1 else { return }
 
-        var points = [point(for: grid.emitterCoord, in: grid)]
-        points.append(contentsOf: trace.segments.map { point(for: $0.coord, in: grid) })
-
-        for i in 0..<(points.count - 1) {
-            addBeamLine(from: points[i], to: points[i + 1])
+        let rows = state.grid.rows
+        let pts = trace.points.map { beamPixel($0, rows: rows) }
+        for i in 0..<(pts.count - 1) {
+            addBeamLine(from: pts[i], to: pts[i + 1])
         }
-        if let last = points.last {
+        if let last = pts.last {
             addBeamDot(at: last)
         }
+    }
+
+    /// Converts a beam point (cell units, y increases downward) to board pixels
+    /// (SpriteKit y increases upward).
+    private func beamPixel(_ p: BeamPoint, rows: Int) -> CGPoint {
+        CGPoint(x: CGFloat(p.x) * tileSize, y: (CGFloat(rows) - CGFloat(p.y)) * tileSize)
     }
 
     private func addBeamLine(from: CGPoint, to: CGPoint) {

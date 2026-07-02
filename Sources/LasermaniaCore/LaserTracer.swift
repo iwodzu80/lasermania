@@ -1,87 +1,100 @@
-public struct BeamTrace: Equatable, Sendable {
-    public struct Segment: Equatable, Sendable {
-        public let coord: Coord
-        public let incoming: Diagonal
-        public let outgoing: Diagonal
-
-        public init(coord: Coord, incoming: Diagonal, outgoing: Diagonal) {
-            self.coord = coord
-            self.incoming = incoming
-            self.outgoing = outgoing
-        }
-    }
-
-    public var segments: [Segment]
-    public var struckSensors: Set<Coord>
-
-    public init(segments: [Segment] = [], struckSensors: Set<Coord> = []) {
-        self.segments = segments
-        self.struckSensors = struckSensors
-    }
-
-    public var litCells: Set<Coord> {
-        Set(segments.map { $0.coord })
+/// A point on the beam polyline, in cell units. Integer coordinates are cell
+/// boundaries; `x = col + 0.5` is a column centre, `y = row` a row's top edge.
+public struct BeamPoint: Equatable, Sendable {
+    public let x: Double
+    public let y: Double
+    public init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
     }
 }
 
-/// Traces the diagonal ("billiard") laser. The beam leaves the emitter on a 45°
-/// diagonal and reflects off the flat faces of steel blocks, walls, and the
-/// board edges: angle of incidence = angle of reflection. It passes through
-/// sensors (marking each struck) so a single beam can clear several at once.
+public struct BeamTrace: Equatable, Sendable {
+    public var points: [BeamPoint]
+    public var struckSensors: Set<Coord>
+    public var litCells: Set<Coord>
+
+    public init(points: [BeamPoint] = [], struckSensors: Set<Coord> = [], litCells: Set<Coord> = []) {
+        self.points = points
+        self.struckSensors = struckSensors
+        self.litCells = litCells
+    }
+}
+
+/// The Lasermania laser as a "half-cell" billiard. The beam leaves the middle
+/// of the emitter cell's top (or bottom) edge, travels on 45° diagonals through
+/// the lanes between blocks, and reflects off the flat faces of fixed/movable
+/// blocks and the screen edges at the cell edge-midpoints — never from cell
+/// centres. It passes through capsules (sensors), marking each struck.
 public enum LaserTracer {
     private struct BeamVisit: Hashable {
-        let coord: Coord
-        let direction: Diagonal
+        let x2: Int
+        let y2: Int
+        let dx: Int
+        let dy: Int
     }
 
     public static func trace(_ state: GameState) -> BeamTrace {
         let grid = state.grid
-        var result = BeamTrace()
-        var direction = grid.emitterDirection
-        var pos = grid.emitterCoord
-        var visited: Set<BeamVisit> = []
-        let maxSteps = grid.columns * grid.rows * 8 + 16
-        var steps = 0
 
-        func isSolid(_ coord: Coord) -> Bool {
-            guard grid.isInBounds(coord) else { return true }   // screen edge reflects
-            if grid.terrain[coord.row][coord.col] == .wall { return true }
-            if state.movables[coord] != nil { return true }     // steel blocks reflect
+        func isBlock(_ col: Int, _ row: Int) -> Bool {
+            if col < 0 || row < 0 || col >= grid.columns || row >= grid.rows { return true }
+            if grid.terrain[row][col] == .wall { return true }
+            if state.movables[Coord(col: col, row: row)] != nil { return true }
             return false
         }
+
+        var dx = grid.emitterDirection.step.dc
+        var dy = grid.emitterDirection.step.dr
+        // Origin: middle of the top edge if firing up, the bottom edge if down.
+        var x = Double(grid.emitterCoord.col) + 0.5
+        var y = dy < 0 ? Double(grid.emitterCoord.row) : Double(grid.emitterCoord.row + 1)
+
+        var result = BeamTrace(points: [BeamPoint(x: x, y: y)])
+        var visited: Set<BeamVisit> = []
+        let maxSteps = grid.columns * grid.rows * 16 + 32
+        var steps = 0
 
         while steps < maxSteps {
             steps += 1
 
-            // Reflect off whatever is directly ahead on the diagonal.
-            if isSolid(pos.moved(direction)) {
-                let horizontal = Coord(col: pos.col + direction.step.dc, row: pos.row)
-                let vertical = Coord(col: pos.col, row: pos.row + direction.step.dr)
-                let solidH = isSolid(horizontal)
-                let solidV = isSolid(vertical)
-                if solidH && solidV {
-                    direction = direction.reversed                 // concave corner
-                } else if solidH {
-                    direction = direction.flippedHorizontally      // vertical face
-                } else if solidV {
-                    direction = direction.flippedVertically        // horizontal face
-                } else {
-                    direction = direction.reversed                 // isolated corner
-                }
-            }
-
-            let next = pos.moved(direction)
-            if isSolid(next) { break }                             // fully boxed in
-
-            let visit = BeamVisit(coord: next, direction: direction)
+            // The (position, direction) state fully determines the future, so a
+            // repeat means a cycle — this catches beams trapped reflecting in a
+            // pocket, where the position never advances between reflections.
+            let visit = BeamVisit(x2: Int((x * 2).rounded()), y2: Int((y * 2).rounded()), dx: dx, dy: dy)
             if visited.contains(visit) { break }
             visited.insert(visit)
 
-            result.segments.append(BeamTrace.Segment(coord: next, incoming: direction, outgoing: direction))
-            pos = next
+            let nx = x + 0.5 * Double(dx)
+            let ny = y + 0.5 * Double(dy)
 
-            if state.remainingSensors.contains(pos) {
-                result.struckSensors.insert(pos)                   // pass through, keep going
+            // Exactly one of nx/ny is an integer: that's the face being crossed.
+            let verticalFace = abs(nx - nx.rounded(.down)) < 1e-6
+            let col: Int
+            let row: Int
+            if verticalFace {
+                let boundary = Int(nx.rounded())
+                col = dx > 0 ? boundary : boundary - 1
+                row = Int(ny.rounded(.down))
+            } else {
+                let boundary = Int(ny.rounded())
+                row = dy > 0 ? boundary : boundary - 1
+                col = Int(nx.rounded(.down))
+            }
+
+            if isBlock(col, row) {
+                if verticalFace { dx = -dx } else { dy = -dy }
+                continue
+            }
+
+            x = nx
+            y = ny
+            result.points.append(BeamPoint(x: x, y: y))
+
+            let cell = Coord(col: col, row: row)
+            result.litCells.insert(cell)
+            if state.remainingSensors.contains(cell) {
+                result.struckSensors.insert(cell)
             }
         }
 
