@@ -98,7 +98,7 @@ private struct GameSceneView: NSViewRepresentable {
     let onPauseToggle: () -> Void
 
     func makeNSView(context: Context) -> SKView {
-        let view = SKView(frame: .zero)
+        let view = BoardSKView(frame: .zero)
         let scene = GameScene(viewModel: viewModel, settings: settings, onPauseToggle: onPauseToggle)
         scene.isInputPaused = isPaused
         view.presentScene(scene)
@@ -109,5 +109,29 @@ private struct GameSceneView: NSViewRepresentable {
         (nsView.scene as? GameScene)?.isInputPaused = isPaused
         guard !isPaused, nsView.window?.firstResponder !== nsView else { return }
         nsView.window?.makeFirstResponder(nsView)
+    }
+}
+
+/// An `SKView` that reliably takes keyboard focus. Launched via `swift run`,
+/// the window doesn't hand the board first-responder status on its own, so the
+/// scene's `keyDown` never fires and the vehicle can't move. This claims focus
+/// as soon as the view joins a window and forwards key events to the scene.
+private final class BoardSKView: SKView {
+    override var acceptsFirstResponder: Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window else { return }
+            window.makeFirstResponder(self)
+        }
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if let scene { scene.keyDown(with: event) } else { super.keyDown(with: event) }
+    }
+
+    override func keyUp(with event: NSEvent) {
+        if let scene { scene.keyUp(with: event) } else { super.keyUp(with: event) }
     }
 }

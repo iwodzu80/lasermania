@@ -68,9 +68,9 @@ public final class GameScene: SKScene {
         boardNode.addChild(terrainLayer)
         boardNode.addChild(sensorsLayer)
         boardNode.addChild(doorLayer)
-        boardNode.addChild(beamLayer)
         boardNode.addChild(movablesLayer)
         boardNode.addChild(capsulesLayer)
+        boardNode.addChild(beamLayer)     // above blocks so the beam is never hidden
         boardNode.addChild(crawlerNode)
         boardNode.addChild(effectsLayer)
         addChild(boardNode)
