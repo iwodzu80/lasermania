@@ -3,7 +3,7 @@
   "name": "First Light",
   "parMoves": 30,
   "legend": {
-    "L": { "type": "emitter", "dir": "ne" }
+    "L": { "type": "emitter", "dir": "se" }
   },
   "layout": [
     "...#.#........#.",
