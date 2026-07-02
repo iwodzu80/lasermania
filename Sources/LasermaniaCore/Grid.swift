@@ -12,7 +12,7 @@ public struct Grid: Equatable, Sendable {
         rows: Int,
         terrain: [[StaticTerrain]],
         emitterCoord: Coord,
-        emitterDirection: Direction,
+        emitterDirection: Diagonal,
         doorCoord: Coord,
         sensorCoords: Set<Coord>
     ) {
