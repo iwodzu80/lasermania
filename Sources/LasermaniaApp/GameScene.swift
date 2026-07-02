@@ -29,9 +29,10 @@ public final class GameScene: SKScene {
     private let crawlerNode = SKNode()
 
     // Sprites cropped from the original screenshot, bundled as resources.
-    private var blockTexture: SKTexture?
-    private var ovalTexture: SKTexture?     // shared by sensors and the emitter
-    private var memoryTexture: SKTexture?
+    private var blockTexture: SKTexture?    // fixed wall blocks (not pushable)
+    private var movableTexture: SKTexture?  // the pushable "marked" blocks
+    private var capsuleTexture: SKTexture?  // laser-target capsules (dragon eye)
+    private var emitterTexture: SKTexture?  // laser source (burger)
     private var vehicleTexture: SKTexture?
     private var baseTexture: SKTexture?
 
@@ -60,8 +61,9 @@ public final class GameScene: SKScene {
         backgroundColor = .black
 
         blockTexture = loadTexture("block")
-        ovalTexture = loadTexture("oval")
-        memoryTexture = loadTexture("memory")
+        movableTexture = loadTexture("movable")
+        capsuleTexture = loadTexture("capsule")
+        emitterTexture = loadTexture("emitter")
         vehicleTexture = loadTexture("vehicle")
         baseTexture = loadTexture("base")
 
@@ -147,7 +149,13 @@ public final class GameScene: SKScene {
                 case .floor:
                     tile.fillColor = .black
                 case .wall:
-                    tile.fillColor = palette.wall
+                    // Fixed blocks: reflect the laser but can't be pushed.
+                    tile.fillColor = .black
+                    if let texture = blockTexture {
+                        tile.addChild(spriteNode(texture))
+                    } else {
+                        tile.addChild(steelBlockShape())
+                    }
                 case .emitter(let direction):
                     tile.fillColor = .black
                     tile.addChild(emitterMarker(direction: direction))
@@ -187,7 +195,7 @@ public final class GameScene: SKScene {
     /// The emitter uses the same oval sprite as the sensors (as in the
     /// original). Falls back to an amber ring + a dot on the firing side.
     private func emitterMarker(direction: Diagonal) -> SKNode {
-        if let texture = ovalTexture {
+        if let texture = emitterTexture {
             return spriteNode(texture)
         }
         let node = SKNode()
@@ -233,7 +241,7 @@ public final class GameScene: SKScene {
         sensorsLayer.removeAllChildren()
         for coord in state.remainingSensors {
             let node: SKNode
-            if let texture = ovalTexture {
+            if let texture = capsuleTexture {
                 node = spriteNode(texture)
             } else {
                 let dot = SKShapeNode(circleOfRadius: tileSize * 0.22)
@@ -318,13 +326,13 @@ public final class GameScene: SKScene {
         beamLayer.addChild(dot)
     }
 
-    /// All movables are steel blocks (the diagonal-laser reflectors). Prefers
-    /// the bundled block sprite; falls back to a green beveled rectangle.
+    /// The pushable blocks — drawn with the "marked" movable sprite so they're
+    /// distinguishable from the fixed wall blocks. Falls back to a green block.
     private func renderMovables(_ state: GameState) {
         movablesLayer.removeAllChildren()
         for (coord, _) in state.movables {
             let node: SKNode
-            if let texture = blockTexture {
+            if let texture = movableTexture {
                 node = spriteNode(texture)
             } else {
                 node = steelBlockShape()
@@ -355,20 +363,16 @@ public final class GameScene: SKScene {
         return node
     }
 
+    /// Drive-over collectibles. Unused in the Lasermania levels (capsules are
+    /// laser targets, handled as sensors), but kept for the engine's generality.
     private func renderCapsules(_ state: GameState) {
         capsulesLayer.removeAllChildren()
         for coord in state.remainingCapsules {
-            let node: SKNode
-            if let texture = memoryTexture {
-                node = spriteNode(texture)
-            } else {
-                let capsule = SKShapeNode(circleOfRadius: tileSize * 0.18)
-                capsule.fillColor = palette.capsule
-                capsule.strokeColor = .clear
-                node = capsule
-            }
-            node.position = point(for: coord, in: state.grid)
-            capsulesLayer.addChild(node)
+            let capsule = SKShapeNode(circleOfRadius: tileSize * 0.18)
+            capsule.fillColor = palette.capsule
+            capsule.strokeColor = .clear
+            capsule.position = point(for: coord, in: state.grid)
+            capsulesLayer.addChild(capsule)
         }
     }
 
