@@ -35,10 +35,12 @@ public enum LaserTracer {
     public static func trace(_ state: GameState) -> BeamTrace {
         let grid = state.grid
 
-        func isSolid(_ coord: Coord) -> Bool {
-            guard grid.isInBounds(coord) else { return true }   // screen edge reflects
+        // Only blocks reflect; the screen edge is NOT a reflector — the beam
+        // leaves the board there and stops.
+        func isBlock(_ coord: Coord) -> Bool {
+            guard grid.isInBounds(coord) else { return false }
             if grid.terrain[coord.row][coord.col] == .wall { return true }
-            if state.movables[coord] != nil { return true }     // fixed + movable blocks reflect
+            if state.movables[coord] != nil { return true }
             return false
         }
         func center(_ coord: Coord) -> BeamPoint {
@@ -55,31 +57,40 @@ public enum LaserTracer {
         while steps < maxSteps {
             steps += 1
 
-            // Reflect off whatever is directly ahead on the diagonal.
-            if isSolid(pos.moved(dir)) {
-                let horizontal = Coord(col: pos.col + dir.step.dc, row: pos.row)
-                let vertical = Coord(col: pos.col, row: pos.row + dir.step.dr)
-                let solidH = isSolid(horizontal)
-                let solidV = isSolid(vertical)
-                if solidH && solidV {
-                    dir = dir.reversed                 // concave corner
-                } else if solidH {
-                    dir = dir.flippedHorizontally       // vertical face
-                } else if solidV {
-                    dir = dir.flippedVertically         // horizontal face
-                } else {
-                    dir = dir.reversed                  // isolated block corner
-                }
-            }
-
-            let next = pos.moved(dir)
-            if isSolid(next) { break }
-
-            let visit = BeamVisit(col: next.col, row: next.row, dir: dir)
+            let visit = BeamVisit(col: pos.col, row: pos.row, dir: dir)
             if visited.contains(visit) { break }
             visited.insert(visit)
 
-            pos = next
+            let ahead = pos.moved(dir)
+
+            if !grid.isInBounds(ahead) {
+                // Beam exits the board through the edge and stops (no reflection).
+                result.points.append(BeamPoint(
+                    x: Double(pos.col) + 0.5 + 0.5 * Double(dir.step.dc),
+                    y: Double(pos.row) + 0.5 + 0.5 * Double(dir.step.dr)))
+                break
+            }
+
+            if isBlock(ahead) {
+                // Angle of incidence = angle of reflection off the block face;
+                // a head-on corner sends the beam back.
+                let horizontal = Coord(col: pos.col + dir.step.dc, row: pos.row)
+                let vertical = Coord(col: pos.col, row: pos.row + dir.step.dr)
+                let solidH = isBlock(horizontal)
+                let solidV = isBlock(vertical)
+                if solidH && solidV {
+                    dir = dir.reversed
+                } else if solidH {
+                    dir = dir.flippedHorizontally
+                } else if solidV {
+                    dir = dir.flippedVertically
+                } else {
+                    dir = dir.reversed
+                }
+                continue
+            }
+
+            pos = ahead
             result.points.append(center(pos))
             result.litCells.insert(pos)
             if state.remainingSensors.contains(pos) {
