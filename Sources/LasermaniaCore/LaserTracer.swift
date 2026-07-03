@@ -1,5 +1,5 @@
-/// A point on the beam polyline, in cell units (`col + 0.5`, `row + 0.5` is a
-/// cell centre). The renderer converts these to board pixels.
+/// A point on the beam polyline, in cell units. Integer coordinates are cell
+/// boundaries; `col + 0.5` is a column centre, `row` a row's top edge.
 public struct BeamPoint: Equatable, Sendable {
     public let x: Double
     public let y: Double
@@ -21,81 +21,83 @@ public struct BeamTrace: Equatable, Sendable {
     }
 }
 
-/// Diagonal laser through cell centres. The beam leaves the emitter on a 45°
-/// diagonal and reflects off the flat faces of fixed/movable blocks and the
-/// board edges (angle in = angle out); a head-on corner sends it back. It
+/// The Lasermania laser. The beam leaves the middle of the emitter cell's top
+/// edge (bottom edge if it fires downward) and travels on 45° diagonals through
+/// the lanes between blocks. At each cell edge it checks the cell it is about to
+/// enter: a block reflects it (angle in = angle out — flip the component across
+/// that face); the screen edge ends the beam (the border does NOT reflect). It
 /// passes through capsules (sensors), marking each struck.
 public enum LaserTracer {
     private struct BeamVisit: Hashable {
-        let col: Int
-        let row: Int
-        let dir: Diagonal
+        let x2: Int
+        let y2: Int
+        let dx: Int
+        let dy: Int
     }
 
     public static func trace(_ state: GameState) -> BeamTrace {
         let grid = state.grid
 
-        // Only blocks reflect; the screen edge is NOT a reflector — the beam
-        // leaves the board there and stops.
-        func isBlock(_ coord: Coord) -> Bool {
-            guard grid.isInBounds(coord) else { return false }
-            if grid.terrain[coord.row][coord.col] == .wall { return true }
-            if state.movables[coord] != nil { return true }
+        func inBounds(_ col: Int, _ row: Int) -> Bool {
+            col >= 0 && row >= 0 && col < grid.columns && row < grid.rows
+        }
+        func isBlock(_ col: Int, _ row: Int) -> Bool {
+            guard inBounds(col, row) else { return false }
+            if grid.terrain[row][col] == .wall { return true }
+            if state.movables[Coord(col: col, row: row)] != nil { return true }
             return false
         }
-        func center(_ coord: Coord) -> BeamPoint {
-            BeamPoint(x: Double(coord.col) + 0.5, y: Double(coord.row) + 0.5)
-        }
 
-        var dir = grid.emitterDirection
-        var pos = grid.emitterCoord
-        var result = BeamTrace(points: [center(pos)])
+        var dx = grid.emitterDirection.step.dc
+        var dy = grid.emitterDirection.step.dr
+        var x = Double(grid.emitterCoord.col) + 0.5
+        var y = dy < 0 ? Double(grid.emitterCoord.row) : Double(grid.emitterCoord.row + 1)
+
+        var result = BeamTrace(points: [BeamPoint(x: x, y: y)])
         var visited: Set<BeamVisit> = []
-        let maxSteps = grid.columns * grid.rows * 8 + 16
+        let maxSteps = grid.columns * grid.rows * 16 + 32
         var steps = 0
 
         while steps < maxSteps {
             steps += 1
 
-            let visit = BeamVisit(col: pos.col, row: pos.row, dir: dir)
+            let visit = BeamVisit(x2: Int((x * 2).rounded()), y2: Int((y * 2).rounded()), dx: dx, dy: dy)
             if visited.contains(visit) { break }
             visited.insert(visit)
 
-            let ahead = pos.moved(dir)
-
-            if !grid.isInBounds(ahead) {
-                // Beam exits the board through the edge and stops (no reflection).
-                result.points.append(BeamPoint(
-                    x: Double(pos.col) + 0.5 + 0.5 * Double(dir.step.dc),
-                    y: Double(pos.row) + 0.5 + 0.5 * Double(dir.step.dr)))
-                break
+            // The beam sits on a cell edge; find the cell it is about to enter.
+            let verticalEdge = abs(x - x.rounded()) < 1e-6
+            let col: Int
+            let row: Int
+            if verticalEdge {
+                let boundary = Int(x.rounded())
+                col = dx > 0 ? boundary : boundary - 1
+                row = Int(y.rounded(.down))
+            } else {
+                let boundary = Int(y.rounded())
+                row = dy > 0 ? boundary : boundary - 1
+                col = Int(x.rounded(.down))
             }
 
-            if isBlock(ahead) {
-                // Angle of incidence = angle of reflection off the block face;
-                // a head-on corner sends the beam back.
-                let horizontal = Coord(col: pos.col + dir.step.dc, row: pos.row)
-                let vertical = Coord(col: pos.col, row: pos.row + dir.step.dr)
-                let solidH = isBlock(horizontal)
-                let solidV = isBlock(vertical)
-                if solidH && solidV {
-                    dir = dir.reversed
-                } else if solidH {
-                    dir = dir.flippedHorizontally
-                } else if solidV {
-                    dir = dir.flippedVertically
-                } else {
-                    dir = dir.reversed
-                }
+            if !inBounds(col, row) {
+                // Beam leaves the board through the edge and stops.
+                result.points.append(BeamPoint(x: x + 0.5 * Double(dx), y: y + 0.5 * Double(dy)))
+                break
+            }
+            if isBlock(col, row) {
+                if verticalEdge { dx = -dx } else { dy = -dy }   // reflect off the face
                 continue
             }
 
-            pos = ahead
-            result.points.append(center(pos))
-            result.litCells.insert(pos)
-            if state.remainingSensors.contains(pos) {
-                result.struckSensors.insert(pos)
+            let cell = Coord(col: col, row: row)
+            result.litCells.insert(cell)
+            if state.remainingSensors.contains(cell) {
+                result.struckSensors.insert(cell)
             }
+
+            x += 0.5 * Double(dx)
+            y += 0.5 * Double(dy)
+            result.points.append(BeamPoint(x: x, y: y))
         }
 
         return result
