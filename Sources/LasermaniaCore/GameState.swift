@@ -48,7 +48,7 @@ public struct GameState: Equatable, Sendable {
         guard let targetTerrain = grid.cell(at: target) else { return nil }
 
         switch targetTerrain {
-        case .wall, .emitter:
+        case .wall, .block, .emitter:
             return nil
         case .sensorSite:
             if remainingSensors.contains(target) { return nil }
@@ -63,7 +63,7 @@ public struct GameState: Equatable, Sendable {
             let beyond = target.moved(move)
             guard let beyondTerrain = grid.cell(at: beyond), movables[beyond] == nil else { return nil }
             switch beyondTerrain {
-            case .wall, .emitter, .sensorSite, .door:
+            case .wall, .block, .emitter, .sensorSite, .door:
                 return nil
             case .floor:
                 break

@@ -41,11 +41,16 @@ public enum LaserTracer {
         func inBounds(_ col: Int, _ row: Int) -> Bool {
             col >= 0 && row >= 0 && col < grid.columns && row < grid.rows
         }
-        func isBlock(_ col: Int, _ row: Int) -> Bool {
+        // Walls and the board edge end the beam (no reflection).
+        func endsBeam(_ col: Int, _ row: Int) -> Bool {
+            guard inBounds(col, row) else { return true }
+            return grid.terrain[row][col] == .wall
+        }
+        // Fixed reflector blocks and movable blocks reflect the beam.
+        func reflects(_ col: Int, _ row: Int) -> Bool {
             guard inBounds(col, row) else { return false }
-            if grid.terrain[row][col] == .wall { return true }
-            if state.movables[Coord(col: col, row: row)] != nil { return true }
-            return false
+            if grid.terrain[row][col] == .block { return true }
+            return state.movables[Coord(col: col, row: row)] != nil
         }
 
         var dx = grid.emitterDirection.step.dc
@@ -79,12 +84,12 @@ public enum LaserTracer {
                 col = Int(x.rounded(.down))
             }
 
-            if !inBounds(col, row) {
-                // Beam leaves the board through the edge and stops.
+            if endsBeam(col, row) {
+                // Beam hits a wall or the board edge and stops (no reflection).
                 result.points.append(BeamPoint(x: x + 0.5 * Double(dx), y: y + 0.5 * Double(dy)))
                 break
             }
-            if isBlock(col, row) {
+            if reflects(col, row) {
                 if verticalEdge { dx = -dx } else { dy = -dy }   // reflect off the face
                 continue
             }

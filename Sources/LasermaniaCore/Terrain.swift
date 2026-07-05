@@ -1,6 +1,7 @@
 public enum StaticTerrain: Hashable, Sendable {
     case floor
-    case wall
+    case wall            // level boundary: ENDS the beam (no reflection), blocks the vehicle
+    case block           // fixed reflector: reflects the beam, blocks the vehicle
     case emitter(Diagonal)
     case sensorSite
     case door

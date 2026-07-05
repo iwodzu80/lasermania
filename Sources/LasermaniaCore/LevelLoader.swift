@@ -73,7 +73,9 @@ public enum LevelLoader {
                 case ".":
                     break
                 case "#":
-                    terrain[rowIndex][colIndex] = .wall
+                    terrain[rowIndex][colIndex] = .block   // fixed reflector block
+                case "W":
+                    terrain[rowIndex][colIndex] = .wall    // boundary wall (ends the beam)
                 case "@":
                     guard crawlerCoord == nil else { throw LevelLoadError.duplicateCrawler(levelID: id) }
                     crawlerCoord = coord

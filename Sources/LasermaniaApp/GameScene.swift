@@ -149,7 +149,10 @@ public final class GameScene: SKScene {
                 case .floor:
                     tile.fillColor = .black
                 case .wall:
-                    // Fixed blocks: reflect the laser but can't be pushed.
+                    // Boundary wall: ends the beam. Drawn as a coloured border bar.
+                    tile.fillColor = SKColor(red: 0.55, green: 0.25, blue: 0.6, alpha: 1)
+                case .block:
+                    // Fixed reflector block: reflects the laser but can't be pushed.
                     tile.fillColor = .black
                     if let texture = blockTexture {
                         tile.addChild(spriteNode(texture))
