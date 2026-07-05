@@ -149,8 +149,10 @@ public final class GameScene: SKScene {
                 case .floor:
                     tile.fillColor = .black
                 case .wall:
-                    // Boundary wall: ends the beam. Drawn as a coloured border bar.
-                    tile.fillColor = SKColor(red: 0.55, green: 0.25, blue: 0.6, alpha: 1)
+                    // Boundary wall: ends the beam. Drawn as the original's
+                    // colored striped bar.
+                    tile.fillColor = .black
+                    tile.addChild(wallBars())
                 case .block:
                     // Fixed reflector block: reflects the laser but can't be pushed.
                     tile.fillColor = .black
@@ -213,6 +215,28 @@ public final class GameScene: SKScene {
         dot.fillColor = Self.amber
         dot.strokeColor = .clear
         node.addChild(dot)
+        return node
+    }
+
+    /// The original's boundary walls are colored striped bars. Approximated
+    /// here as vertical pink / blue / green stripes with a dark edge.
+    private func wallBars() -> SKNode {
+        let node = SKNode()
+        let colors: [SKColor] = [
+            SKColor(red: 0.85, green: 0.35, blue: 0.70, alpha: 1),  // pink
+            SKColor(red: 0.30, green: 0.50, blue: 0.95, alpha: 1),  // blue
+            SKColor(red: 0.25, green: 0.80, blue: 0.40, alpha: 1)   // green
+        ]
+        let inset = tileSize * 0.08
+        let width = tileSize - inset * 2
+        let stripe = width / CGFloat(colors.count)
+        for (i, color) in colors.enumerated() {
+            let bar = SKShapeNode(rectOf: CGSize(width: stripe, height: tileSize - inset * 2))
+            bar.fillColor = color
+            bar.strokeColor = .clear
+            bar.position = CGPoint(x: -width / 2 + stripe * (CGFloat(i) + 0.5), y: 0)
+            node.addChild(bar)
+        }
         return node
     }
 
