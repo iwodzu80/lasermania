@@ -1,16 +1,22 @@
 {
   "id": "level-02",
-  "name": "Step Aside",
-  "parMoves": 10,
-  "sensorModel": "A",
+  "name": "Columns",
+  "parMoves": 40,
   "legend": {
-    "L": { "type": "emitter", "dir": "right" }
+    "L": { "type": "emitter", "dir": "ne" }
   },
   "layout": [
-    "##########",
-    "#@.......#",
-    "#L..B...S#",
-    "#........#",
-    "########D#"
+    "WWWWWWWWWWWWWWW.",
+    "W......@.....DW.",
+    "W.B.B.B.B.B.B.W.",
+    "W.B.B.B.B.B.B.W.",
+    "W.B.B.B.B.B.B.W.",
+    "W.B.B.BLB.B.B.W.",
+    "W.B.B.B.B.B.B.W.",
+    "W.B.B.B.B.B.B.W.",
+    "W.B.B.B.B.B.B.W.",
+    "W.B.B.B.B.B.B.W.",
+    "W.SSSSSSSSSSSSW.",
+    "WWWWWWWWWWWWWWW."
   ]
 }
